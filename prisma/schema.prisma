@@ -1,0 +1,147 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String     @id @default(dbgenerated("(uuid())")) @db.Char(36)
+  name          String     @db.VarChar(255)
+  email         String     @unique(map: "email") @db.VarChar(255)
+  createdAt     DateTime?  @default(now()) @map("created_at") @db.Timestamp(0)
+  activities    Activity[]
+  assignedDeals Deal[]     @relation("UserDeals")
+  assignedLeads Lead[]     @relation("UserLeads")
+
+  @@map("users")
+}
+
+model Company {
+  id        String       @id @default(dbgenerated("(uuid())")) @db.Char(36)
+  name      String       @db.VarChar(255)
+  cnpj      String?      @db.VarChar(18)
+  industry  String?      @db.VarChar(100)
+  size      CompanySize?
+  website   String?      @db.Text
+  address   Json?
+  createdAt DateTime?    @default(now()) @map("created_at") @db.Timestamp(0)
+  updatedAt DateTime?    @default(now()) @updatedAt @map("updated_at") @db.Timestamp(0)
+  contacts  Contact[]
+
+  @@map("companies")
+}
+
+model Contact {
+  id          String     @id @default(dbgenerated("(uuid())")) @db.Char(36)
+  companyId   String?    @map("company_id") @db.Char(36)
+  name        String     @db.VarChar(255)
+  email       String?    @db.VarChar(255)
+  phone       String?    @db.VarChar(20)
+  position    String?    @db.VarChar(100)
+  linkedinUrl String?    @map("linkedin_url") @db.Text
+  notes       String?    @db.Text
+  tags        Json?
+  createdAt   DateTime?  @default(now()) @map("created_at") @db.Timestamp(0)
+  updatedAt   DateTime?  @default(now()) @updatedAt @map("updated_at") @db.Timestamp(0)
+  activities  Activity[]
+  company     Company?   @relation(fields: [companyId], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "contacts_ibfk_1")
+  deals       Deal[]
+  lead        Lead[]
+
+  @@index([companyId], map: "company_id")
+  @@map("contacts")
+}
+
+model Lead {
+  id         String      @id @default(dbgenerated("(uuid())")) @db.Char(36)
+  contactId  String?     @map("contact_id") @db.Char(36)
+  source     String?     @db.VarChar(100)
+  status     LeadStatus? @default(NEW)
+  score      Int?        @default(0)
+  assignedTo String?     @map("assigned_to") @db.Char(36)
+  createdAt  DateTime?   @default(now()) @map("created_at") @db.Timestamp(0)
+  updatedAt  DateTime?   @default(now()) @updatedAt @map("updated_at") @db.Timestamp(0)
+  contact    Contact?    @relation(fields: [contactId], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "leads_ibfk_1")
+  user       User?       @relation("UserLeads", fields: [assignedTo], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "leads_ibfk_2")
+
+  @@index([assignedTo], map: "assigned_to")
+  @@index([contactId], map: "contact_id")
+  @@map("leads")
+}
+
+model Deal {
+  id                String     @id @default(dbgenerated("(uuid())")) @db.Char(36)
+  contactId         String?    @map("contact_id") @db.Char(36)
+  title             String     @db.VarChar(255)
+  value             Decimal?   @db.Decimal(10, 2)
+  stage             DealStage?
+  probability       Int?       @default(0)
+  expectedCloseDate DateTime?  @map("expected_close_date") @db.Date
+  assignedTo        String?    @map("assigned_to") @db.Char(36)
+  notes             String?    @db.Text
+  createdAt         DateTime?  @default(now()) @map("created_at") @db.Timestamp(0)
+  updatedAt         DateTime?  @default(now()) @updatedAt @map("updated_at") @db.Timestamp(0)
+  activities        Activity[]
+  contact           Contact?   @relation(fields: [contactId], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "deals_ibfk_1")
+  user              User?      @relation("UserDeals", fields: [assignedTo], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "deals_ibfk_2")
+
+  @@index([assignedTo], map: "assigned_to")
+  @@index([contactId], map: "contact_id")
+  @@map("deals")
+}
+
+model Activity {
+  id          String        @id @default(dbgenerated("(uuid())")) @db.Char(36)
+  dealId      String?       @map("deal_id") @db.Char(36)
+  contactId   String?       @map("contact_id") @db.Char(36)
+  userId      String?       @map("user_id") @db.Char(36)
+  type        ActivityType?
+  title       String?       @db.VarChar(255)
+  description String?       @db.Text
+  dueDate     DateTime?     @map("due_date") @db.Timestamp(0)
+  completed   Boolean?      @default(false)
+  createdAt   DateTime?     @default(now()) @map("created_at") @db.Timestamp(0)
+  deal        Deal?         @relation(fields: [dealId], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "activities_ibfk_1")
+  contact     Contact?      @relation(fields: [contactId], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "activities_ibfk_2")
+  user        User?         @relation(fields: [userId], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "activities_ibfk_3")
+
+  @@index([contactId], map: "contact_id")
+  @@index([dealId], map: "deal_id")
+  @@index([userId], map: "user_id")
+  @@map("activities")
+}
+
+enum CompanySize {
+  STARTUP    @map("startup")
+  SMALL      @map("small")
+  MEDIUM     @map("medium")
+  LARGE      @map("large")
+  ENTERPRISE @map("enterprise")
+}
+
+enum LeadStatus {
+  NEW         @map("new")
+  CONTACTED   @map("contacted")
+  QUALIFIED   @map("qualified")
+  UNQUALIFIED @map("unqualified")
+}
+
+enum DealStage {
+  PROSPECTING   @map("prospecting")
+  QUALIFICATION @map("qualification")
+  PROPOSAL      @map("proposal")
+  NEGOTIATION   @map("negotiation")
+  CLOSED_WON    @map("closed_won")
+  CLOSED_LOST   @map("closed_lost")
+}
+
+enum ActivityType {
+  CALL    @map("call")
+  EMAIL   @map("email")
+  MEETING @map("meeting")
+  TASK    @map("task")
+  NOTE    @map("note")
+}
