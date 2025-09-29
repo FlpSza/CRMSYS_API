@@ -309,6 +309,147 @@ app.get('/health', (req: Request, res: Response) => {
   });
 });
 
+// POST /api/deals - Criar nova oportunidade
+app.post('/api/deals', async (req: Request, res: Response) => {
+  try {
+    const { title, value, stage, probability, contactId, userId, notes, expectedCloseDate } = req.body;
+
+    // Validar dados obrigatórios
+    if (!title || !value || !stage || !contactId) {
+      return res.status(400).json({ 
+        error: 'Título, valor, estágio e contato são obrigatórios' 
+      });
+    }
+
+    const deal = await prisma.deal.create({
+      data: {
+        title,
+        value: Number(value),
+        stage,
+        probability: Number(probability) || 0,
+        contactId,
+        user: userId ? { connect: { id: userId } } : undefined,
+        notes,
+        expectedCloseDate: expectedCloseDate ? new Date(expectedCloseDate) : null
+      },
+      include: {
+        contact: {
+          include: {
+            company: true
+          }
+        },
+        user: true
+      }
+    });
+
+    res.status(201).json(deal);
+  } catch (error: any) {
+    console.error('Create deal error:', error);
+    res.status(500).json({ error: 'Erro interno do servidor' });
+  }
+});
+
+// GET /api/deals/:id - Buscar oportunidade específica
+app.get('/api/deals/:id', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+
+    const deal = await prisma.deal.findUnique({
+      where: { id },
+      include: {
+        contact: {
+          include: {
+            company: true
+          }
+        },
+        user: true,
+        activities: {
+          orderBy: { createdAt: 'desc' },
+          take: 10
+        }
+      }
+    });
+
+    if (!deal) {
+      return res.status(404).json({ error: 'Oportunidade não encontrada' });
+    }
+
+    res.json(deal);
+  } catch (error) {
+    console.error('Get deal error:', error);
+    res.status(500).json({ error: 'Erro interno do servidor' });
+  }
+});
+
+// PUT /api/deals/:id - Atualizar oportunidade
+app.put('/api/deals/:id', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { title, value, stage, probability, contactId, userId, notes, expectedCloseDate } = req.body;
+
+    // Verificar se a oportunidade existe
+    const existingDeal = await prisma.deal.findUnique({
+      where: { id }
+    });
+
+    if (!existingDeal) {
+      return res.status(404).json({ error: 'Oportunidade não encontrada' });
+    }
+
+    const deal = await prisma.deal.update({
+      where: { id },
+      data: {
+        title,
+        value: value ? Number(value) : undefined,
+        stage,
+        probability: probability ? Number(probability) : undefined,
+        contactId,
+        user: userId ? { connect: { id: userId } } : undefined,
+        notes,
+        expectedCloseDate: expectedCloseDate ? new Date(expectedCloseDate) : null
+      },
+      include: {
+        contact: {
+          include: {
+            company: true
+          }
+        },
+        user: true
+      }
+    });
+
+    res.json(deal);
+  } catch (error: any) {
+    console.error('Update deal error:', error);
+    res.status(500).json({ error: 'Erro interno do servidor' });
+  }
+});
+
+// DELETE /api/deals/:id - Excluir oportunidade
+app.delete('/api/deals/:id', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+
+    // Verificar se a oportunidade existe
+    const existingDeal = await prisma.deal.findUnique({
+      where: { id }
+    });
+
+    if (!existingDeal) {
+      return res.status(404).json({ error: 'Oportunidade não encontrada' });
+    }
+
+    await prisma.deal.delete({
+      where: { id }
+    });
+
+    res.status(204).send();
+  } catch (error) {
+    console.error('Delete deal error:', error);
+    res.status(500).json({ error: 'Erro interno do servidor' });
+  }
+});
+
 // 404 handler
 app.use('*', (req: Request, res: Response) => {
   res.status(404).json({ 
